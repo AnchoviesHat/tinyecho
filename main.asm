@@ -92,20 +92,61 @@ get_conn:
     ; Save off the connection socket file descriptor for later use
     mov [rel connfd], rax
 
+echo:
+    xor r9, r9   ; Init Read Finished
+    xor r10, r10 ; Init Write Finished
+
+.read_pre:
+    ; If both read and write are 1, there is no data left to echo; Close the socket
+    and r9, r10
+    cmp r9, 1
+    je close
+
+    mov r9, 1 ; Start as "finished reading"
+    mov r12, buf_len ; Reset buffer pull size to max
+
+.read:
     ; Read data from the connection socket
     mov rax, SYSCALL_READ
     mov rdi, [rel connfd]
+    mov rdx, r12
     mov rsi, buf
-    mov rdx, buf_len
     syscall
 
+    cmp rax, 0
+    je echo.write_pre ; Jump to write, we've read all the bytes we can
+    jl error          ; If this value is negative, read is not happy
+
+    ; Shrink the buffer length for the next read so that we don't overrun memory
+    sub r12, rax      ; (prev_buffer_size - read_bytes)
+    mov r9, 0         ; Mark this as a read loop that did work so we know we have to run read again later
+    jmp echo.read
+
+.write_pre:
+    mov r10, 1 ; Start as "finished writing"
+
+    ; Calculate the size that was read and put it in r12
+    mov rcx, r12
+    mov r12, buf_len
+    sub r12, rcx
+
+.write:
     ; Echo data back to the connection socket
     mov rax, SYSCALL_WRITE
     mov rdi, [rel connfd]
+    mov rdx, r12
     mov rsi, buf
-    mov rdx, buf_len
     syscall
 
+    cmp rax, 0
+    je echo.read_pre ; Jump back to read, we've written all our bytes in the buffer
+    jl error         ; If this value is negative, write is not happy
+
+    sub r12, rax     ; (prev_buffer_size - written_bytes)
+    mov r10, 0       ; Mark this as a write loop that did work so we know we may have to run write again later
+    jmp echo.write
+
+close:
     ; Close the connection
     mov rax, SYSCALL_CLOSE
     mov rdi, [rel connfd]
@@ -134,7 +175,7 @@ section .data
     sock_addr_len: equ $ - sock_addr ; total len (28 bytes)
 
     yes: dd 1
-    buf_len: equ 255
+    buf_len: equ 4096
 
 section .bss
     sockfd: resd 1 ; Server's main listening socket fd
