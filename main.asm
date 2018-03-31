@@ -27,120 +27,120 @@ section .text
 
 global start
 start:
-	; Open the main server socket
+    ; Open the main server socket
     mov rax, SYSCALL_SOCKET
     mov rdi, AF_INET6
-	mov rsi, SOCK_STREAM
-	mov rdx, PROTO_TCP
-	syscall
+    mov rsi, SOCK_STREAM
+    mov rdx, PROTO_TCP
+    syscall
 
-	; Verify that we got a file descriptor, not an error
-	cmp rax, 0
-	jl error
+    ; Verify that we got a file descriptor, not an error
+    cmp rax, 0
+    jl error
 
-	; Save off the server socket file descriptor for later use
-	mov [rel sockfd], rax
+    ; Save off the server socket file descriptor for later use
+    mov [rel sockfd], rax
 
-	; Set the socket allow address reuse so that the application
-	; can be restarted quickly during testing
+    ; Set the socket allow address reuse so that the application
+    ; can be restarted quickly during testing
     mov rax, SYSCALL_SETSOCKOPT
     mov rdi, [rel sockfd]
     mov rsi, SOL_SOCKET
-	mov rdx, SO_REUSEADDR
-	mov r10, yes
-	mov r8, 4
-	syscall
+    mov rdx, SO_REUSEADDR
+    mov r10, yes
+    mov r8, 4
+    syscall
 
     ; Verify that the reuse address option properly applied
-	cmp rax, 0
-	jl error
+    cmp rax, 0
+    jl error
 
-	; Bind to 0.0.0.0:8080
-	mov rax, SYSCALL_BIND
-	mov rdi, [rel sockfd]
-	mov rsi, sock_addr
-	mov rdx, sock_addr_len
-	syscall
+    ; Bind to 0.0.0.0:8080
+    mov rax, SYSCALL_BIND
+    mov rdi, [rel sockfd]
+    mov rsi, sock_addr
+    mov rdx, sock_addr_len
+    syscall
 
     ; Verify that the bind succeeded
-	cmp rax, -1
-	je error
+    cmp rax, -1
+    je error
 
-	; Listen on the bound port, accept an incoming unhandled queue of up to BACKLOG connections
-	mov rax, SYSCALL_LISTEN
-	mov rdi, [rel sockfd]
-	mov rsi, BACKLOG
-	syscall
+    ; Listen on the bound port, accept an incoming unhandled queue of up to BACKLOG connections
+    mov rax, SYSCALL_LISTEN
+    mov rdi, [rel sockfd]
+    mov rsi, BACKLOG
+    syscall
 
     ; Verify that the listen succeeded
-	cmp rax, 0
-	jl error
+    cmp rax, 0
+    jl error
 
 get_conn:
 
-	; Accept new connection from the server socket
-	mov rax, SYSCALL_ACCEPT
-	mov rdi, [rel sockfd]
-	mov rsi, in_conn_addr
-	mov rdx, in_conn_size
-	syscall
+    ; Accept new connection from the server socket
+    mov rax, SYSCALL_ACCEPT
+    mov rdi, [rel sockfd]
+    mov rsi, in_conn_addr
+    mov rdx, in_conn_size
+    syscall
 
     ; Verify that the accept succeeded
-	cmp rax, 0
-	jl error
+    cmp rax, 0
+    jl error
 
-	; Save off the connection socket file descriptor for later use
-	mov [rel connfd], rax
+    ; Save off the connection socket file descriptor for later use
+    mov [rel connfd], rax
 
-	; Read data from the connection socket
-	mov rax, SYSCALL_READ
-	mov rdi, [rel connfd]
-	mov rsi, buf
-	mov rdx, buf_len
-	syscall
+    ; Read data from the connection socket
+    mov rax, SYSCALL_READ
+    mov rdi, [rel connfd]
+    mov rsi, buf
+    mov rdx, buf_len
+    syscall
 
-	; Echo data back to the connection socket
-	mov rax, SYSCALL_WRITE
-	mov rdi, [rel connfd]
-	mov rsi, buf
-	mov rdx, buf_len
-	syscall
+    ; Echo data back to the connection socket
+    mov rax, SYSCALL_WRITE
+    mov rdi, [rel connfd]
+    mov rsi, buf
+    mov rdx, buf_len
+    syscall
 
-	; Close the connection
-	mov rax, SYSCALL_CLOSE
-	mov rdi, [rel connfd]
-	syscall
+    ; Close the connection
+    mov rax, SYSCALL_CLOSE
+    mov rdi, [rel connfd]
+    syscall
 
-	; Handle the next connection
-	jmp get_conn
+    ; Handle the next connection
+    jmp get_conn
 
 exit:
-	mov rax, SYSCALL_EXIT
-	mov rdi, 0
-	syscall
+    mov rax, SYSCALL_EXIT
+    mov rdi, 0
+    syscall
 
 error:
-	mov rax, SYSCALL_EXIT
-	mov rdi, 1
-	syscall
+    mov rax, SYSCALL_EXIT
+    mov rdi, 1
+    syscall
 
 section .data
-	sock_addr:
-		dw 0x1E1C
-		dw 0x901F
-		dq 0x0
-		dq 0x0
-		dq 0x0
-	sock_addr_len: equ $ - sock_addr
+    sock_addr:
+        dw 0x1E1C
+        dw 0x901F
+        dq 0x0
+        dq 0x0
+        dq 0x0
+    sock_addr_len: equ $ - sock_addr
 
-	yes: dd 1
-	buf_len: equ 255
+    yes: dd 1
+    buf_len: equ 255
 
 section .bss
-	sockfd: resd 1
-	connfd: resd 1
+    sockfd: resd 1
+    connfd: resd 1
 
-	in_conn_addr: resb sock_addr_len
-	in_conn_size: resb 4
+    in_conn_addr: resb sock_addr_len
+    in_conn_size: resb 4
 
-	buf: resb buf_len
+    buf: resb buf_len
