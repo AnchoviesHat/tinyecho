@@ -126,21 +126,23 @@ error:
 
 section .data
     sock_addr:
-        dw 0x1E1C
-        dw 0x901F
+        dw 0x1E1C ; IPv6 << 8 | total len (28 bytes)
+        dw 0x901F ; Port 8080 - this is big endian
+        dq 0x0    ; The remaining bytes are ip address and zero padding
         dq 0x0
         dq 0x0
-        dq 0x0
-    sock_addr_len: equ $ - sock_addr
+    sock_addr_len: equ $ - sock_addr ; total len (28 bytes)
 
     yes: dd 1
     buf_len: equ 255
 
 section .bss
-    sockfd: resd 1
-    connfd: resd 1
+    sockfd: resd 1 ; Server's main listening socket fd
+    connfd: resd 1 ; Transient connection fd
 
+    ; Space for the ip address of the incoming connection
     in_conn_addr: resb sock_addr_len
     in_conn_size: resb 4
 
+    ; Echo buffer
     buf: resb buf_len
